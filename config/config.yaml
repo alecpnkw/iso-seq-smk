@@ -1,0 +1,3 @@
+samples: "config/samples.csv"
+reference: "resources/SIRV.fa"
+annotation: "resources/SIRV_annotation.gtf"

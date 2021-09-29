@@ -1,0 +1,13 @@
+*
+!.gitignore
+!workflow/
+!workflow/rules/*
+!workflow/scripts/*
+!workflow/Snakefile
+!config/
+!config/*
+!resources/
+!resources/*
+!results/
+!README.md
+!LICENCE.md
