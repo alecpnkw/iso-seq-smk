@@ -1,3 +1,7 @@
 samples: "config/samples.csv"
 reference: "resources/SIRV.fa"
 annotation: "resources/SIRV_annotation.gtf"
+transcriptclean_path: "../TranscriptClean/TranscriptClean.py"
+require_short_read_validation: true
+short_read_splice_junctions:
+  - "resources/out.SJ.tab"

@@ -18,9 +18,9 @@ samples = pd.read_csv(config["samples"], sep = ',').set_index("sample", drop=Fal
 rule all:
     input:
         #outputs from TALON... 
-        expand("results/minimap2_filt/{sample}.sam", sample = samples.index)
-        #expand("results/{dataset}_talon.gtf", dataset = samples["dataset"]),
-        #expand("results/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
+        #expand("results/minimap2_filt/{sample}.sam", sample = samples.index)
+        expand("results/talon/{dataset}_talon.gtf", dataset = samples["dataset"]),
+        expand("results/talon/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
         #expand("results/talon_label/{sample}_labeled.sam", sample = samples.index)
 
 # Todo: add intial PacBio processing...
@@ -55,6 +55,8 @@ rule minimap2_sam:
     resources:
         mem_mb = 10000
     threads: 6
+    resources:
+        memory = 6000
     envmodules:
         "samtools/1.9",
         "minimap2/2.17"
@@ -101,47 +103,53 @@ rule filter_sam:
 
 # decide how to deal with these...
 # ask denis for the R script that runs this!
-#rule merge_sjs:
-#    input:  
-#        config["short_read_splice_junctions"]
-#    output:
-#        "results/merge_sjs/SJ.merged.tab"
-#    script:
-#        "merge_sjs.R"
+#From the documentation I think concatenation would also work...
+rule merge_sjs:
+    input:  
+        config["short_read_splice_junctions"]
+    output:
+        "results/merge_sjs/SJ.merged.tab"
+    shell:
+        "cat {input} > {output}"
 
-# this looks like it pulls a trailing space off chr names...
-#rule rename_fasta_chromosomes:
-#    input: config["reference"]
-#    output: "results/renamed_ref/{dataset}_renamed.fa"
-#    shell:
-#        """
-#        cut -d ' ' -f1 {input} > {output}
-#        """
+# this looks like it pulls the first field of the chr names...
+rule rename_fasta_chromosomes:
+    input: config["reference"]
+    output: "results/renamed_ref/{dataset}_renamed.fa"
+    shell:
+        """
+        cut -d ' ' -f1 {input} > {output}
+        """
 
 # start of TranscriptClean
 # perhaps add acondition to filter based on short-read splice junctions...
-#rule transcript_clean:
-#    input:
-#        expand("results/minimap2_filt/{sample}.sam", sample=samples.index), #all the .sam files...
-#        "results/renamed_ref/{dataset}_renamed.fa", #genome
-#        "results/merge_sjs/SJ.merged.tab"  #merged SJs
-#    output:
-#        "results/transcript_clean/{sample}/{sample}_clean.sam" # Todo: figure out what this output is...
-#    params:
-#        output_prefix = lambda wc, output: dirname(output)
-#    shell:
-#        """
-#        TranscriptClean \
-#        --sam {input[0]} \
-#        --genome {input[1]} \
-#        --spliceJns {input[2]} \
-#        --tmpDir {tempdir} \
-#        --threads {threads} \
-#        --deleteTmp \
-#        --canonOnly \
-#        --primaryOnly \
-#        --outprefix {params.output_prefix}
-#        """
+# one .sam at a time
+rule transcript_clean:
+    input:
+        "results/minimap2_filt/{sample}.sam",
+        "results/renamed_ref/{dataset}_renamed.fa", #genome
+        "results/merge_sjs/SJ.merged.tab"  #merged SJs
+    output:
+        "results/transcript_clean/{dataset}/{sample}_clean.sam" # Todo: figure out what this output is...
+    params:
+        output_prefix = lambda wc, output: dirname(output[0]),
+        tc_exec = config["transcriptclean_path"],
+        tempdir = "tmp/{dataset}_{sample}"
+    conda: 
+        "envs/transcript_clean.yaml"
+    shell:
+        """
+        python3  {params.tc_exec} \
+        --sam {input[0]} \
+        --genome {input[1]} \
+        --spliceJns {input[2]} \
+        --tmpDir {params.tempdir} \
+        --threads {threads} \
+        --deleteTmp \
+        --canonOnly \
+        --primaryOnly \
+        --outprefix {params.output_prefix}
+        """
 
 #Start of TALON
 #rule talon_all:
@@ -156,7 +164,7 @@ rule talon_initialize:
     input:
         config["annotation"] #pass in via config
     output:
-        "results/gene_models.db" #only one genemodels.db per run...
+        "results/talon/{dataset}_gene_models.db" #only one genemodels.db per run...
     conda:
         "envs/talon.yaml"
     params:
@@ -179,10 +187,10 @@ rule talon_initialize:
 #label/flag reads...
 rule talon_label:
     input:
-        "results/minimap2_filt/{sample}.sam" #aligned, filtered reads
+        "results/transcript_clean/{dataset}/{sample}_clean.sam" #aligned, filtered reads
     output:
-        "results/talon_label/{sample}_labeled.sam",
-        "results/talon_label/{sample}_read_labels.tsv"
+        "results/talon_label/{dataset}/{sample}_labeled.sam",
+        "results/talon_label/{dataset}/{sample}_read_labels.tsv"
     conda:
         "envs/talon.yaml"
     threads: 1
@@ -203,42 +211,43 @@ rule talon_label:
         --o {params.output_prefix}
         """
 
-def labeled_paths(wc):
-    return ["results/talon_label/{0}_labeled.sam".format(s) for s in samples.index]
+#def labeled_paths(wc):
+#    return ["results/talon_label/{dataset}/{0}_labeled.sam".format(s) for s in samples.index]
 
 #writes a new config.csv... 
 #tweak this... 
 rule create_talon_config:
+    input:
+        # all labeled files as input... 
+        expand("results/talon_label/{dataset}/{sample}_labeled.sam", zip, sample = samples.index, dataset = samples.dataset)
     params:
-        config = "config/samples.csv",
-        paths = labeled_paths
+        config = config["samples"]
     output:
-        "results/{dataset}_config.csv"
+        "results/talon/{dataset}_config.csv"
     run:
         import pandas as pd
         tbl = pd.read_csv(params.config, sep = ',')
-        tbl["file"] = params.paths
+        tbl["file"] = input
         keeps = tbl.dataset == wildcards.dataset
         cols = ["sample", "dataset", "source", "file"]
         tbl.loc[keeps, cols].to_csv(output[0], header = False, index = False)
 
 #samples (dataframe) must be defined...
-def talon_input(wc):
-    keeps = samples.dataset == wc.dataset
-    return ["results/talon_label/{0}_labeled.sam".format(s) for s in samples.index[keeps]]
+#def talon_input(wc):
+#    keeps = samples.dataset == wc.dataset
+#    return ["results/talon_label/{0}_labeled.sam".format(s) for s in samples.index[keeps]]
 
 #TALON... 
 rule talon:
     input:
-        talon_input,
-        config = "results/{dataset}_config.csv",
-        db = "results/gene_models.db"
+        config = "results/talon/{dataset}_config.csv",
+        db = "results/talon/{dataset}_gene_models.db"
     params: 
         build = basename(config["reference"])
     threads:
         10
     output:
-        "results/{dataset}_QC.log"
+        "results/talon/{dataset}_QC.log"
     conda:
         "envs/talon.yaml"
     shell: 
@@ -258,10 +267,10 @@ rule talon:
 # this differs from Denis's run... which supplies an SQL query
 rule talon_filter:
     input:
-        "results/gene_models.db",
-        "results/{dataset}_QC.log"
+        "results/talon/{dataset}_gene_models.db",
+        "results/talon/{dataset}_QC.log"
     output:
-        "results/{dataset}_filtered_transcripts.csv"
+        "results/talon/{dataset}_filtered_transcripts.csv"
     params:
         samples = lambda wc: ",".join(samples.index[samples.dataset == wc.dataset]),
         maxFracA = 0.5,
@@ -285,10 +294,10 @@ rule talon_filter:
 #tabulate
 rule talon_abundance:
     input:
-        "results/gene_models.db",
-        "results/{dataset}_filtered_transcripts.csv"
+        "results/talon/{dataset}_gene_models.db",
+        "results/talon/{dataset}_filtered_transcripts.csv"
     output: 
-        "results/{dataset}_talon_abundance_filtered.tsv"
+        "results/talon/{dataset}_talon_abundance_filtered.tsv"
     conda:
         "envs/talon.yaml"
     params:
@@ -308,10 +317,10 @@ rule talon_abundance:
 #GTF
 rule talon_GTF:
     input:
-        "results/gene_models.db",
-        "results/{dataset}_filtered_transcripts.csv"
+        "results/talon/{dataset}_gene_models.db",
+        "results/talon/{dataset}_filtered_transcripts.csv"
     output:
-        "results/{dataset}_talon.gtf"
+        "results/talon/{dataset}_talon.gtf"
     conda:
         "envs/talon.yaml"
     params:
