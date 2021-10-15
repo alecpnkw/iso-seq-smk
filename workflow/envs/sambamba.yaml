@@ -1,0 +1,5 @@
+channels:
+  - bioconda
+dependencies:
+  - samtools==1.9
+  - sambamba==0.5.6

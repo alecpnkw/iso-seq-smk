@@ -1,8 +1,12 @@
 *
 !.gitignore
 !workflow/
+!workflow/rules/
 !workflow/rules/*
+!workflow/scripts/
 !workflow/scripts/*
+!workflow/envs/
+!workflow/envs/*
 !workflow/Snakefile
 !config/
 !config/*
