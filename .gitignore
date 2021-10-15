@@ -10,4 +10,5 @@
 !resources/*
 !results/
 !README.md
-!LICENCE.md
+!LICENSE.md
+!lsf.yaml

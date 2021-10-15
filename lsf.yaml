@@ -1,0 +1,21 @@
+__default__:
+  - "-P acc_PBG"
+  - "-W 01:00"
+  - "-n 1"
+  - "-R rusage[mem=4000]"
+  - "-R span[hosts=1]"
+
+flnc_to_fastq:
+  - "-W 00:30"
+  - "-q express"
+  - "-R rusage[mem=10000]"
+
+minimap2_sam:
+  - "-W 03:00"
+  - "-q premium"
+  - "-R rusage[mem=6000]"
+
+filter_sam:
+  - "-W 00:30"
+  - "-q express"
+  - "-R rusage[mem=1000]"

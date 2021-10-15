@@ -32,8 +32,8 @@ def INPUT_BAM(wc):
 rule flnc_to_fastq:
     input: INPUT_BAM
     output: "results/flnc_fastq/{sample}.fastq.gz"
-    conda:
-        "envs/samtools.yaml"
+    #conda:
+    #    "envs/samtools.yaml"
     envmodules:
         "samtools/1.11"
     shell:
@@ -50,11 +50,15 @@ rule minimap2_sam:
     output:
         "results/minimap2/{sample}.sam" # can add additional output files
     params:
-        output_prefix = lambda wc, output: output[0].split(".sam")[0]
-    threads: 3
+        output_prefix = lambda wc, output: output[0].split(".sam")[0],
+        threads = 30
+    threads: 6
+    envmodules:
+        "samtools/1.9",
+        "minimap2/2.17"
     shell:
         """
-        minimap2 -ax splice -uf --secondary=no -C5 -t {threads} --MD {input.target} {input.query} | \
+        minimap2 -ax splice -uf --secondary=no -C5 -t {params.threads} --MD {input.target} {input.query} | \
         samtools sort -O sam -o {output} && \
         samtools flagstat {output} > {params.output_prefix}.flagstat && \
         samtools idxstats {output} > {params.output_prefix}.idxstats && \
@@ -68,11 +72,12 @@ rule filter_sam:
     output:
         "results/minimap2_filt/{sample}.sam"
     threads:
-        30
+        5
     params:
-        output_prefix = lambda wc, output: output[0].split('.sam')[0]
-    conda:
-        "envs/sambamba.yaml"
+        output_prefix = lambda wc, output: output[0].split('.sam')[0],
+        threads = 30
+    #conda:
+    #    "envs/sambamba.yaml"
     envmodules:
         "samtools/1.9",
         "sambamba/0.5.6"
@@ -80,7 +85,7 @@ rule filter_sam:
         """
         sambamba view \
         --with-header \
-        --nthreads {threads} \
+        --nthreads {params.threads} \
         --sam-input \
         --format sam \
         --filter "not unmapped and mapping quality >= 50" \
