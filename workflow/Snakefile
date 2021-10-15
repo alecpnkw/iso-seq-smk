@@ -51,7 +51,9 @@ rule minimap2_sam:
         "results/minimap2/{sample}.sam" # can add additional output files
     params:
         output_prefix = lambda wc, output: output[0].split(".sam")[0],
-        threads = 12
+        threads = 6
+    resources:
+        mem_mb = 10000
     threads: 6
     envmodules:
         "samtools/1.9",
