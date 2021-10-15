@@ -19,3 +19,36 @@ filter_sam:
   - "-W 01:00"
   - "-q express"
   - "-R rusage[mem=5000]"
+
+#rename_fasta_chromosomes:
+
+#merge_sjs:
+
+transcript_clean:
+  - "-W 06:00"
+  - "-q premium"
+  - "-R rusage[mem=5000]"
+
+talon_label:
+  - "-W 03:00"
+  - "-R rusage[mem=15000]"
+
+#create_talon_config:
+
+#talon_initialize:
+
+talon:
+  - "-q premium"
+  - "-W 12:00"
+  - "-R rusage[mem=10000]"
+
+talon_filter:
+  - "-W 03:00"
+  - "-R rusage[mem=10000]"
+
+talon_GTF:
+  - "-R rusage[mem=10000]"
+
+talon_abundance:
+  - "-W 03:00"
+  - "-R rusage[mem=10000]"
