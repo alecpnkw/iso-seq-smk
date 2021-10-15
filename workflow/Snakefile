@@ -7,21 +7,12 @@ configfile: "config/config.yaml"
 
 samples = pd.read_csv(config["samples"], sep = ',').set_index("sample", drop=False)
 
-## TALON module
-#module TALON:
-#    snakefile:
-#        github("alecpnkw/talon-smk-module", path="workflow/Snakefile", branch="272703d")
-#    config: 
-#        config #specify config here if you only want particular fields passed 
-
 # targeting...
 rule all:
     input:
         #outputs from TALON... 
-        #expand("results/minimap2_filt/{sample}.sam", sample = samples.index)
         expand("results/talon/{dataset}_talon.gtf", dataset = samples["dataset"]),
         expand("results/talon/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
-        #expand("results/talon_label/{sample}_labeled.sam", sample = samples.index)
 
 # Todo: add intial PacBio processing...
 
@@ -151,13 +142,6 @@ rule transcript_clean:
         --outprefix {params.output_prefix}
         """
 
-#Start of TALON
-#rule talon_all:
-#    input:
-#        expand("results/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
-#        expand("results/{dataset}_talon.gtf", dataset = samples["dataset"]),
-#        expand("results/labeled/{sample}_labeled.sam", sample = samples.index)
-
 # initialize db (uses SQLite)...
 # follow up with Denis about additional options...
 rule talon_initialize:
@@ -211,9 +195,6 @@ rule talon_label:
         --o {params.output_prefix}
         """
 
-#def labeled_paths(wc):
-#    return ["results/talon_label/{dataset}/{0}_labeled.sam".format(s) for s in samples.index]
-
 #writes a new config.csv... 
 #tweak this... 
 rule create_talon_config:
@@ -231,11 +212,6 @@ rule create_talon_config:
         keeps = tbl.dataset == wildcards.dataset
         cols = ["sample", "dataset", "source", "file"]
         tbl.loc[keeps, cols].to_csv(output[0], header = False, index = False)
-
-#samples (dataframe) must be defined...
-#def talon_input(wc):
-#    keeps = samples.dataset == wc.dataset
-#    return ["results/talon_label/{0}_labeled.sam".format(s) for s in samples.index[keeps]]
 
 #TALON... 
 rule talon:
@@ -336,17 +312,3 @@ rule talon_GTF:
         --build {params.build} \
         --o {params.output_prefix}
         """
-
-#rule length_hist: 
-#    input:
-#        "results/{dataset}_talon_abundance_filtered.tsv"
-#    output:
-#        "results/plots/{dataset}_length_hist.png"
-#    run:
-#        models = pd.read_csv(input[0], sep = '\t')
-#        nbins = 20
-#        fig, ax = plt.subplots()
-#        n, bins, patches = ax.hist(models.length, nbins, alpha = 0.5)
-#        ax.set_xlabel("model length")
-#        ax.set_ylabel("model count")
-#        fig.savefig(output[0], dpi = 200)
