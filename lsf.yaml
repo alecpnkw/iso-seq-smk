@@ -6,16 +6,16 @@ __default__:
   - "-R span[hosts=1]"
 
 flnc_to_fastq:
-  - "-W 00:30"
+  - "-W 01:30"
   - "-q express"
   - "-R rusage[mem=10000]"
 
 minimap2_sam:
-  - "-W 03:00"
+  - "-W 06:00"
   - "-q premium"
-  - "-R rusage[mem=6000]"
+  - "-R rusage[mem=10000]"
 
 filter_sam:
-  - "-W 00:30"
+  - "-W 01:00"
   - "-q express"
-  - "-R rusage[mem=1000]"
+  - "-R rusage[mem=5000]"
