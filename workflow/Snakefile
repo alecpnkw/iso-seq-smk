@@ -1,60 +1,335 @@
 from snakemake.utils import min_version
 import pandas as pd
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-matplotlib.use('Agg')
+from os.path import dirname, basename
 min_version("6.0")
 
 configfile: "config/config.yaml"
 
 samples = pd.read_csv(config["samples"], sep = ',').set_index("sample", drop=False)
 
-#TALON module
-module TALON:
-    snakefile:
-        github("alecpnkw/talon-smk-module", path="workflow/Snakefile", branch="master")
-    config: 
-        config #specify config here if you only want particular fields passed 
+## TALON module
+#module TALON:
+#    snakefile:
+#        github("alecpnkw/talon-smk-module", path="workflow/Snakefile", branch="272703d")
+#    config: 
+#        config #specify config here if you only want particular fields passed 
 
-#targeting...
+# targeting...
 rule all:
     input:
         #outputs from TALON... 
-        expand("results/plots/{dataset}_length_hist.png", dataset = samples["dataset"]),
         expand("results/{dataset}_talon.gtf", dataset = samples["dataset"]),
-        expand("results/labeled/{sample}_labeled.sam", sample = samples.index)
+        expand("results/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
+        expand("results/talon_label/{sample}_labeled.sam", sample = samples.index)
 
-#import rules
-use rule * from TALON as TALON_*
+# Todo: add intial PacBio processing...
+
+def INPUT_BAM(wc):
+    return samples.loc[wc.sample, "input_bam"]
+
+# FLNC .bam to .fastq
+rule flnc_to_fastq:
+    input: INPUT_BAM
+    output: "results/flnc_fastq/{sample}.fastq.gz"
+    conda:
+        "envs/samtools.yaml"
+    envmodules:
+        "samtools/1.11"
+    shell:
+        """
+        samtools view {input} | \
+        awk '{{printf("@%s\\n%s\\n+\\n%s\\n", $1, $10, $11)}}' | \
+        gzip > {output}
+        """
 
 rule minimap2_sam:
     input:
         target=config["reference"], # can be either genome index or genome fasta
-        query="resources/flnc/{sample}.fastq"
+        query="results/flnc_fastq/{sample}.fastq.gz"
     output:
-        "results/aligned/{sample}.sam"
-    log:
-        "results/logs/minimap2/{sample}.log"
+        "results/minimap2/{sample}.sam" # can add additional output files
     params:
-        extra="-x map-pb",           # optional
-        sorting="none",                 # optional: Enable sorting. Possible values: 'none', 'queryname' or 'coordinate'
-        sort_extra=""                # optional: extra arguments for samtools/picard
+        output_prefix = lambda wc, output: output[0].split(".sam")[0]
     threads: 3
-    wrapper:
-        "0.78.0/bio/minimap2/aligner"
+    shell:
+        """
+        minimap2 -ax splice -uf --secondary=no -C5 -t {threads} --MD {input.target} {input.query} | \
+        samtools sort -O sam -o {output} && \
+        samtools flagstat {output} > {params.output_prefix}.flagstat && \
+        samtools idxstats {output} > {params.output_prefix}.idxstats && \
+        samtools stats {output} > {params.output_prefix}.stats && \
+        samtools view {output} | cut -f1,5 > {params.output_prefix}.mapq
+        """
 
-rule length_hist: 
+rule filter_sam:
     input:
-        "results/{dataset}_talon_abundance_filtered.tsv"
+        "results/minimap2/{sample}.sam"
     output:
-        "results/plots/{dataset}_length_hist.png"
+        "results/minimap2_filt/{sample}.sam"
+    threads:
+        30
+    params:
+        output_prefix = lambda wc, output: output[0].split('.sam')[0]
+    conda:
+        "envs/sambamba.yaml"
+    envmodules:
+        "samtools/1.9",
+        "sambamba/0.5.6"
+    shell:
+        """
+        sambamba view \
+        --with-header \
+        --nthreads {threads} \
+        --sam-input \
+        --format sam \
+        --filter "not unmapped and mapping quality >= 50" \
+        {input} | \
+        samtools sort -O sam -o {output} && \
+        samtools flagstat {output} > {params.output_prefix}.flagstat && \
+        samtools idxstats {output} > {params.output_prefix}.idxstats && \
+        samtools stats {output} > {params.output_prefix}.stats && \
+        samtools view {output} | cut -f1,5 > {params.output_prefix}.mapq
+        """
+
+# decide how to deal with these...
+# ask denis for the R script that runs this!
+#rule merge_sjs:
+#    input:  
+#        config["short_read_splice_junctions"]
+#    output:
+#        "results/merge_sjs/SJ.merged.tab"
+#    script:
+#        "merge_sjs.R"
+
+# this looks like it pulls a trailing space off chr names...
+#rule rename_fasta_chromosomes:
+#    input: config["reference"]
+#    output: "results/renamed_ref/{dataset}_renamed.fa"
+#    shell:
+#        """
+#        cut -d ' ' -f1 {input} > {output}
+#        """
+
+# start of TranscriptClean
+# perhaps add acondition to filter based on short-read splice junctions...
+#rule transcript_clean:
+#    input:
+#        expand("results/minimap2_filt/{sample}.sam", sample=samples.index), #all the .sam files...
+#        "results/renamed_ref/{dataset}_renamed.fa", #genome
+#        "results/merge_sjs/SJ.merged.tab"  #merged SJs
+#    output:
+#        "results/transcript_clean/{sample}/{sample}_clean.sam" # Todo: figure out what this output is...
+#    params:
+#        output_prefix = lambda wc, output: dirname(output)
+#    shell:
+#        """
+#        TranscriptClean \
+#        --sam {input[0]} \
+#        --genome {input[1]} \
+#        --spliceJns {input[2]} \
+#        --tmpDir {tempdir} \
+#        --threads {threads} \
+#        --deleteTmp \
+#        --canonOnly \
+#        --primaryOnly \
+#        --outprefix {params.output_prefix}
+#        """
+
+#Start of TALON
+#rule talon_all:
+#    input:
+#        expand("results/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
+#        expand("results/{dataset}_talon.gtf", dataset = samples["dataset"]),
+#        expand("results/labeled/{sample}_labeled.sam", sample = samples.index)
+
+# initialize db (uses SQLite)...
+# follow up with Denis about additional options...
+rule talon_initialize:
+    input:
+        config["annotation"] #pass in via config
+    output:
+        "results/gene_models.db" #only one genemodels.db per run...
+    conda:
+        "envs/talon.yaml"
+    params:
+        annot = basename(config["annotation"]),
+        build = basename(config["reference"]),
+        output_prefix = lambda wildcards, output: output[0].split('.')[0]
+    shell: 
+        """
+        talon_initialize_database \
+        --f {input} \
+        --a {params.annot} \
+        --g {params.build} \
+        --l 200 \
+        --idprefix TALON \
+        --5p 1000 \
+        --3p 1000 \
+        --o {params.output_prefix}
+        """
+
+#label/flag reads...
+rule talon_label:
+    input:
+        "results/minimap2_filt/{sample}.sam" #aligned, filtered reads
+    output:
+        "results/talon_label/{sample}_labeled.sam",
+        "results/talon_label/{sample}_read_labels.tsv"
+    conda:
+        "envs/talon.yaml"
+    threads: 1
+    params:
+        output_prefix = lambda wc, output: output[0].split('_labeled.sam')[0],
+        ref = config["reference"],
+        ar = 20,
+        tempdir = "tmp/{sample}/"
+    shell:
+        """
+        talon_label_reads \
+        --f {input} \
+        --g {params.ref}  \
+        --t {threads} \
+        --ar {params.ar} \
+        --tmpDir {params.tempdir} \
+        --deleteTmp \
+        --o {params.output_prefix}
+        """
+
+def labeled_paths(wc):
+    return ["results/talon_label/{0}_labeled.sam".format(s) for s in samples.index]
+
+#writes a new config.csv... 
+#tweak this... 
+rule create_talon_config:
+    params:
+        config = "config/samples.csv",
+        paths = labeled_paths
+    output:
+        "results/{dataset}_config.csv"
     run:
-        models = pd.read_csv(input[0], sep = '\t')
-        nbins = 20
-        fig, ax = plt.subplots()
-        n, bins, patches = ax.hist(models.length, nbins, alpha = 0.5)
-        ax.set_xlabel("model length")
-        ax.set_ylabel("model count")
-        fig.savefig(output[0], dpi = 200)
-        
+        import pandas as pd
+        tbl = pd.read_csv(params.config, sep = ',')
+        tbl["file"] = params.paths
+        keeps = tbl.dataset == wildcards.dataset
+        cols = ["sample", "dataset", "source", "file"]
+        tbl.loc[keeps, cols].to_csv(output[0], header = False, index = False)
+
+#samples (dataframe) must be defined...
+def talon_input(wc):
+    keeps = samples.dataset == wc.dataset
+    return ["results/talon_label/{0}_labeled.sam".format(s) for s in samples.index[keeps]]
+
+#TALON... 
+rule talon:
+    input:
+        talon_input,
+        config = "results/{dataset}_config.csv",
+        db = "results/gene_models.db"
+    params: 
+        build = basename(config["reference"])
+    threads:
+        10
+    output:
+        "results/{dataset}_QC.log"
+    conda:
+        "envs/talon.yaml"
+    shell: 
+        """
+        talon \
+        --f {input.config} \
+        --db {input.db} \
+        --build {params.build} \
+        --threads {threads}
+        --cov 0.99 \
+        --identity 0.95 \
+        --o results/{wildcards.dataset}
+        """
+
+# transcript model filtering... 
+# dataset names need to match talon config...
+# this differs from Denis's run... which supplies an SQL query
+rule talon_filter:
+    input:
+        "results/gene_models.db",
+        "results/{dataset}_QC.log"
+    output:
+        "results/{dataset}_filtered_transcripts.csv"
+    params:
+        samples = lambda wc: ",".join(samples.index[samples.dataset == wc.dataset]),
+        maxFracA = 0.5,
+        minCount = 5,
+        minDatasets = 2,
+        annot = basename(config["annotation"])
+    conda:
+        "envs/talon.yaml"
+    shell:
+        """
+        talon_filter_transcripts \
+        --db {input[0]} \
+        --datasets {params.samples} \
+        -a {params.annot} \
+        --maxFracA {params.maxFracA} \
+        --minCount {params.minCount} \
+        --minDatasets {params.minDatasets} \
+        --o {output}
+        """
+
+#tabulate
+rule talon_abundance:
+    input:
+        "results/gene_models.db",
+        "results/{dataset}_filtered_transcripts.csv"
+    output: 
+        "results/{dataset}_talon_abundance_filtered.tsv"
+    conda:
+        "envs/talon.yaml"
+    params:
+        annot = basename(config["annotation"]),
+        build = basename(config["reference"]),
+        output_prefix = lambda wc, output: output[0].split("_talon_abundance_filtered.tsv")[0]
+    shell:
+        """
+        talon_abundance \
+        --db {input[0]} \
+        --whitelist {input[1]} \
+        --annot {params.annot} \
+        --build {params.build} \
+        --o {params.output_prefix}
+        """
+
+#GTF
+rule talon_GTF:
+    input:
+        "results/gene_models.db",
+        "results/{dataset}_filtered_transcripts.csv"
+    output:
+        "results/{dataset}_talon.gtf"
+    conda:
+        "envs/talon.yaml"
+    params:
+        annot = basename(config["annotation"]),
+        build = basename(config["reference"]),
+        output_prefix = lambda wc, output: output[0][:-10] 
+    shell: 
+        """
+        talon_create_GTF \
+        --db {input[0]} \
+        --whitelist {input[1]} \
+        -a {params.annot} \
+        --build {params.build} \
+        --o {params.output_prefix}
+        """
+
+#rule length_hist: 
+#    input:
+#        "results/{dataset}_talon_abundance_filtered.tsv"
+#    output:
+#        "results/plots/{dataset}_length_hist.png"
+#    run:
+#        models = pd.read_csv(input[0], sep = '\t')
+#        nbins = 20
+#        fig, ax = plt.subplots()
+#        n, bins, patches = ax.hist(models.length, nbins, alpha = 0.5)
+#        ax.set_xlabel("model length")
+#        ax.set_ylabel("model count")
+#        fig.savefig(output[0], dpi = 200)
