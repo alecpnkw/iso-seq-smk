@@ -18,9 +18,10 @@ samples = pd.read_csv(config["samples"], sep = ',').set_index("sample", drop=Fal
 rule all:
     input:
         #outputs from TALON... 
-        expand("results/{dataset}_talon.gtf", dataset = samples["dataset"]),
-        expand("results/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
-        expand("results/talon_label/{sample}_labeled.sam", sample = samples.index)
+        expand("results/minimap2_filt/{sample}.sam", sample = samples.index)
+        #expand("results/{dataset}_talon.gtf", dataset = samples["dataset"]),
+        #expand("results/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
+        #expand("results/talon_label/{sample}_labeled.sam", sample = samples.index)
 
 # Todo: add intial PacBio processing...
 
