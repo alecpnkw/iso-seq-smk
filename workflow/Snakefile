@@ -83,7 +83,7 @@ rule filter_sam:
         --nthreads {params.threads} \
         --sam-input \
         --format sam \
-        --filter "not unmapped and mapping quality >= 50" \
+        --filter "not unmapped and mapping_quality >= 50" \
         {input} | \
         samtools sort -O sam -o {output} && \
         samtools flagstat {output} > {params.output_prefix}.flagstat && \
