@@ -1,7 +1,7 @@
-samples: "config/samples.csv"
+samples: "config/samples.tsv"
 reference: "../resources/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa"
 annotation: "../resources/Homo_sapiens.GRCh38.104.gtf"
-transcriptclean_path: "hpc/users/pankoa01/opt/TranscriptClean/TranscriptClean.py"
+transcriptclean_path: "/hpc/users/pankoa01/opt/TranscriptClean/TranscriptClean.py"
 require_short_read_validation: true
 short_read_splice_junctions:
   - ../star-rsem/results/star-pe/92-1-rep1_GRCh38/SJ.out.tab

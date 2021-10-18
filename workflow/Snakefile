@@ -5,14 +5,13 @@ min_version("6.0")
 
 configfile: "config/config.yaml"
 
-samples = pd.read_csv(config["samples"], sep = ',').set_index("sample", drop=False)
+samples = pd.read_csv(config["samples"], sep = '\t').set_index("sample", drop=False)
 
 # targeting...
 rule all:
     input:
         #outputs from TALON... 
-        expand("results/talon/{dataset}_talon.gtf", dataset = samples["dataset"]),
-        expand("results/talon/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
+        "results/multiqc/multiqc-report.html"
 
 # Todo: add intial PacBio processing...
 
@@ -33,7 +32,8 @@ rule flnc_to_fastq:
         awk '{{printf("@%s\\n%s\\n+\\n%s\\n", $1, $10, $11)}}' | \
         gzip > {output}
         """
-
+        
+# Todo: add minimap2 conda env
 rule minimap2_sam:
     input:
         target=config["reference"], # can be either genome index or genome fasta
@@ -43,11 +43,9 @@ rule minimap2_sam:
     params:
         output_prefix = lambda wc, output: output[0].split(".sam")[0],
         threads = 6
-    resources:
-        mem_mb = 10000
     threads: 6
     resources:
-        memory = 6000
+        mem_mb = 6000 #change to mem_mb
     envmodules:
         "samtools/1.9",
         "minimap2/2.17"
@@ -121,11 +119,15 @@ rule transcript_clean:
         "results/renamed_ref/{dataset}_renamed.fa", #genome
         "results/merge_sjs/SJ.merged.tab"  #merged SJs
     output:
-        "results/transcript_clean/{dataset}/{sample}_clean.sam" # Todo: figure out what this output is...
+        multiext("results/transcript_clean/{dataset}/{sample}/TC_clean", ".sam", ".log", ".fa", ".TE.log")
     params:
         output_prefix = lambda wc, output: dirname(output[0]),
         tc_exec = config["transcriptclean_path"],
-        tempdir = "tmp/{dataset}_{sample}"
+        tempdir = "tmp/{dataset}_{sample}/"
+    threads:
+        10
+    resources:
+        mem_mb = 8000
     conda: 
         "envs/transcript_clean.yaml"
     shell:
@@ -148,41 +150,40 @@ rule talon_initialize:
     input:
         config["annotation"] #pass in via config
     output:
-        "results/talon/{dataset}_gene_models.db" #only one genemodels.db per run...
+        "results/talon/{dataset}_gene_models.db", #only one genemodels.db per run...
     conda:
         "envs/talon.yaml"
     params:
         annot = basename(config["annotation"]),
-        build = basename(config["reference"]),
-        output_prefix = lambda wildcards, output: output[0].split('.')[0]
+        output_prefix = lambda wildcards, output: output[0].split('.db')[0]
+    threads:
+        4
+    resources:
+        mem_mb = 6000 # change to mem_mb
     shell: 
         """
         talon_initialize_database \
         --f {input} \
         --a {params.annot} \
-        --g {params.build} \
-        --l 200 \
-        --idprefix TALON \
-        --5p 1000 \
-        --3p 1000 \
+        --g {wildcards.dataset} \
         --o {params.output_prefix}
         """
 
 #label/flag reads...
 rule talon_label:
     input:
-        "results/transcript_clean/{dataset}/{sample}_clean.sam" #aligned, filtered reads
+        "results/transcript_clean/{dataset}/{sample}/TC_clean.sam" #aligned, filtered reads
     output:
         "results/talon_label/{dataset}/{sample}_labeled.sam",
         "results/talon_label/{dataset}/{sample}_read_labels.tsv"
     conda:
         "envs/talon.yaml"
-    threads: 1
+    threads: 2
     params:
         output_prefix = lambda wc, output: output[0].split('_labeled.sam')[0],
         ref = config["reference"],
         ar = 20,
-        tempdir = "tmp/{sample}/"
+        tempdir = "tmp/talon/{sample}/"
     shell:
         """
         talon_label_reads \
@@ -222,6 +223,8 @@ rule talon:
         build = basename(config["reference"])
     threads:
         10
+    resources:
+        mem_mb = 10000
     output:
         "results/talon/{dataset}_QC.log"
     conda:
@@ -231,11 +234,11 @@ rule talon:
         talon \
         --f {input.config} \
         --db {input.db} \
-        --build {params.build} \
-        --threads {threads}
+        --build {wildcards.dataset} \
+        --threads {threads} \
         --cov 0.99 \
         --identity 0.95 \
-        --o results/{wildcards.dataset}
+        --o results/talon/{wildcards.dataset}
         """
 
 # transcript model filtering... 
@@ -253,6 +256,10 @@ rule talon_filter:
         minCount = 5,
         minDatasets = 2,
         annot = basename(config["annotation"])
+    threads:
+        4
+    resources:
+        mem_mb = 5000 
     conda:
         "envs/talon.yaml"
     shell:
@@ -276,9 +283,12 @@ rule talon_abundance:
         "results/talon/{dataset}_talon_abundance_filtered.tsv"
     conda:
         "envs/talon.yaml"
+    threads:
+        4
+    resources:
+        mem_mb = 5000
     params:
         annot = basename(config["annotation"]),
-        build = basename(config["reference"]),
         output_prefix = lambda wc, output: output[0].split("_talon_abundance_filtered.tsv")[0]
     shell:
         """
@@ -286,7 +296,7 @@ rule talon_abundance:
         --db {input[0]} \
         --whitelist {input[1]} \
         --annot {params.annot} \
-        --build {params.build} \
+        --build {wildcards.dataset} \
         --o {params.output_prefix}
         """
 
@@ -301,14 +311,33 @@ rule talon_GTF:
         "envs/talon.yaml"
     params:
         annot = basename(config["annotation"]),
-        build = basename(config["reference"]),
-        output_prefix = lambda wc, output: output[0][:-10] 
+        output_prefix = lambda wc, output: output[0][:-10]
+    threads:
+        4
+    resources:
+        mem_mb = 5000
     shell: 
         """
         talon_create_GTF \
         --db {input[0]} \
         --whitelist {input[1]} \
         -a {params.annot} \
-        --build {params.build} \
+        --build {wildcards.dataset} \
         --o {params.output_prefix}
+        """
+
+rule multiqc:
+    input:
+        expand("results/talon/{dataset}_talon.gtf", dataset = samples["dataset"]),
+        expand("results/talon/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
+    output:
+        "results/multiqc/multiqc-report.html"
+    conda: 
+        "envs/multiqc.yaml"
+    shell:
+        """
+        multiqc \
+        --no-data-dir \
+        --filename {output} \
+        results/
         """

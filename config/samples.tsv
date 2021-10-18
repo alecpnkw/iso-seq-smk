@@ -1,0 +1,4 @@
+sample	replicate	dataset	source	input_bam
+92_1	1	GRCh38.104_UM	PacBio-Sequel2	../pacbio/92_1.flnc.bam
+MEL202	1	GRCh38.104_UM	PacBio-Sequel2	../pacbio/MEL202.flnc.bam
+MP65	1	GRCh38.104_UM	PacBio-Sequel2	../pacbio/MP65.flnc.bam
