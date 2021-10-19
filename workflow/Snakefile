@@ -210,7 +210,7 @@ rule create_talon_config:
         "results/talon/{dataset}_config.csv"
     run:
         import pandas as pd
-        tbl = pd.read_csv(params.config, sep = ',')
+        tbl = pd.read_csv(params.config, sep = '\t')
         tbl["file"] = input
         keeps = tbl.dataset == wildcards.dataset
         cols = ["sample", "dataset", "source", "file"]
