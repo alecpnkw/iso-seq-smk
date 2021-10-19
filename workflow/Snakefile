@@ -255,8 +255,8 @@ rule talon_filter:
     params:
         samples = lambda wc: ",".join(samples.index[samples.dataset == wc.dataset]),
         maxFracA = 0.5,
-        minCount = 5,
-        minDatasets = 2,
+        minCount = 0,
+        minDatasets = 0,
         annot = basename(config["annotation"])
     threads:
         4
