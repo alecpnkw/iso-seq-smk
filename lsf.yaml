@@ -1,3 +1,11 @@
+# Currently, the default memory in the lsf profile
+# is what defines the amount of memory per node. 
+# Even though the values here are passed to the cluster
+# command, they do not seem to have an effect. Instead, 
+# define the required memory/threads using the `mem_mb`
+# and `threads` for each rule in the snakefile. The 
+# other options seem to be working.
+
 __default__:
   - "-P acc_PBG"
   - "-W 01:00"
@@ -20,9 +28,11 @@ filter_sam:
   - "-q express"
   - "-R rusage[mem=5000]"
 
-#rename_fasta_chromosomes:
+rename_fasta_chromosomes:
+  - "-R rusage[mem=3000]"
 
-#merge_sjs:
+merge_sjs:
+  - "-R rusage[mem=3000]"
 
 transcript_clean:
   - "-W 06:00"
@@ -33,9 +43,11 @@ talon_label:
   - "-W 03:00"
   - "-R rusage[mem=15000]"
 
-#create_talon_config:
+create_talon_config:
+  - "-R rusage[mem=4000]"
 
-#talon_initialize:
+talon_initialize:
+  - "-R rusage[mem=6000]"
 
 talon:
   - "-q premium"
@@ -52,3 +64,7 @@ talon_GTF:
 talon_abundance:
   - "-W 03:00"
   - "-R rusage[mem=10000]"
+
+multiqc: 
+  - "-R rusage[mem=3000]"
+  - "-W 00:30"
