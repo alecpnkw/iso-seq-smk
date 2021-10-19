@@ -11,6 +11,8 @@ samples = pd.read_csv(config["samples"], sep = '\t').set_index("sample", drop=Fa
 rule all:
     input:
         #outputs from TALON... 
+        expand("results/talon/{dataset}_talon.gtf", dataset = samples["dataset"]),
+        expand("results/talon/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
         "results/multiqc/multiqc-report.html"
 
 # Todo: add intial PacBio processing...
