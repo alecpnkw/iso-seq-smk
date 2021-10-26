@@ -68,3 +68,13 @@ talon_abundance:
 multiqc: 
   - "-R rusage[mem=3000]"
   - "-W 00:30"
+
+sqanti_qc:
+  - "-q premium"
+  - "-W 18:00"
+  - "-R rusage[mem=8000]"
+
+cDNA_cupcake_init:
+  - "-q express"
+  - "-W 1:00"
+  - "-R rusage[mem=5000]"

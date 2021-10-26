@@ -7,13 +7,15 @@ configfile: "config/config.yaml"
 
 samples = pd.read_csv(config["samples"], sep = '\t').set_index("sample", drop=False)
 
+localrules: all, cDNA_cupcake_init
+
 # targeting...
 rule all:
     input:
         #outputs from TALON... 
         expand("results/talon/{dataset}_talon.gtf", dataset = samples["dataset"]),
         expand("results/talon/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
-        expand("results/squanti3/{dataset}/{dataset}_corrected.gtf", dataset = samples["dataset"]),
+        expand("results/sqanti3/{dataset}/{dataset}_corrected.gtf", dataset = samples["dataset"]),
         "results/multiqc/multiqc-report.html"
 
 # Todo: add intial PacBio processing...
@@ -329,13 +331,29 @@ rule talon_GTF:
         --o {params.output_prefix}
         """
 
+# still needs work... 
+rule cDNA_cupcake_init:
+    output: "logs/cDNA_cupcake_init.success.log"
+    params: 
+        path = config["cDNA_cupcake_path"]
+    conda: "envs/sqanti3.yaml"
+    shell: 
+        """
+        WDIR=pwd
+        cd {params.path}
+        python {params.path}/setup.py build
+        python {params.path}/setup.py install
+        touch $"{WDIR}"{output}
+        """
+
 rule sqanti_qc:
     input:
+        "logs/cDNA_cupcake_init.success.log",
         isoforms = "results/talon/{dataset}_talon.gtf",
         annot = config["annotation"],
         genome = "results/renamed_ref/{dataset}_renamed.fa" # pass in renamed chr for consistency
     output:
-        "results/squanti3/{dataset}/{dataset}_corrected.gtf"
+        "results/sqanti3/{dataset}/{dataset}_corrected.gtf"
     conda:
         "envs/sqanti3.yaml"
     params:
@@ -344,12 +362,13 @@ rule sqanti_qc:
         out_dir = lambda wc, output: dirname(output[0]),
         cage_path = config["CAGE_peaks"],
         polya_motifs = config["polyA_motifs"]
-    threads: 8
+    threads: 12
     resources:
-        mem_mb = 5000
+        mem_mb = 8000
     shell:
         """
         python workflow/scripts/sqanti3_qc.py \
+        {input.isoforms} {input.annot} {input.genome} \
         --cage_peak CAGE_PEAK \
         --polyA_motif_list POLYA_MOTIF_LIST \
         -t {threads} \
@@ -358,7 +377,6 @@ rule sqanti_qc:
         -o {wildcards.dataset} \
         -c {params.sj_files} \
         {params.addtl_opt}\
-        {input.isoforms} {input.annot} {input.genome}
         """
 
 rule multiqc:
