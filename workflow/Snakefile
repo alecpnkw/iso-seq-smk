@@ -13,6 +13,7 @@ rule all:
         #outputs from TALON... 
         expand("results/talon/{dataset}_talon.gtf", dataset = samples["dataset"]),
         expand("results/talon/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
+        expand("results/squanti3/{dataset}/{dataset}_corrected.gtf", dataset = samples["dataset"]),
         "results/multiqc/multiqc-report.html"
 
 # Todo: add intial PacBio processing...
@@ -322,10 +323,42 @@ rule talon_GTF:
         """
         talon_create_GTF \
         --db {input[0]} \
-        --whitelist {input[1]} \
+        --whitelist {input[1]} \`
         -a {params.annot} \
         --build {wildcards.dataset} \
         --o {params.output_prefix}
+        """
+
+rule sqanti_qc:
+    input:
+        isoforms = "results/talon/{dataset}_talon.gtf",
+        annot = config["annotation"],
+        genome = "results/renamed_ref/{dataset}_renamed.fa" # pass in renamed chr for consistency
+    output:
+        "results/squanti3/{dataset}/{dataset}_corrected.gtf"
+    conda:
+        "envs/sqanti3.yaml"
+    params:
+        addtl_opt = "--force_id_ignore --skipORF --report both ",
+        sj_files = config["short_read_splice_junctions"],
+        out_dir = lambda wc, output: dirname(output[0]),
+        cage_path = config["CAGE_peaks"],
+        polya_motifs = config["polyA_motifs"]
+    threads: 8
+    resources:
+        mem_mb = 5000
+    shell:
+        """
+        python workflow/scripts/sqanti3_qc.py \
+        --cage_peak CAGE_PEAK \
+        --polyA_motif_list POLYA_MOTIF_LIST \
+        -t {threads} \
+        -n {threads} \
+        -d {params.out_dir} \
+        -o {wildcards.dataset} \
+        -c {params.sj_files} \
+        {params.addtl_opt}\
+        {input.isoforms} {input.annot} {input.genome}
         """
 
 rule multiqc:

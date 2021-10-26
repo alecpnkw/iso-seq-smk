@@ -10,5 +10,8 @@ short_read_splice_junctions:
   - ../star-rsem/results/star-pe/MEL202-rep2_GRCh38/SJ.out.tab
   - ../star-rsem/results/star-pe/MP65-rep1_GRCh38/SJ.out.tab
   - ../star-rsem/results/star-pe/MP65-rep2_GRCh38/SJ.out.tab
-  
+CAGE_peaks:
+  - opt/SQANTI3/data/ref_TSS_annotation/human.refTSS_v3.1.hg38.bed"
+polyA_motifs:
+  - "opt/SQANTI3/data/polyA_motifs/mouse_and_human.polyA_motif.txt"
   
