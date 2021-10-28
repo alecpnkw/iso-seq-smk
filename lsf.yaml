@@ -70,8 +70,8 @@ multiqc:
   - "-W 00:30"
 
 sqanti_qc:
-  - "-q premium"
-  - "-W 18:00"
+  - "-q express"
+  - "-W 6:00"
   - "-R rusage[mem=8000]"
 
 cDNA_cupcake_init:

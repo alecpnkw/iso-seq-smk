@@ -7,7 +7,7 @@ configfile: "config/config.yaml"
 
 samples = pd.read_csv(config["samples"], sep = '\t').set_index("sample", drop=False)
 
-localrules: all, cDNA_cupcake_init
+localrules: all, cDNA_cupcake_init # needs to be executed on login node to download pacakges...
 
 # targeting...
 rule all:
@@ -339,11 +339,10 @@ rule cDNA_cupcake_init:
     conda: "envs/sqanti3.yaml"
     shell: 
         """
-        WDIR=pwd
+        WDIR=$(pwd)
         cd {params.path}
-        python {params.path}/setup.py build
-        python {params.path}/setup.py install
-        touch $"{WDIR}"{output}
+        python {params.path}/setup.py build 2>&1 > $WDIR/{output}
+        python {params.path}/setup.py install 2>&1 > $WDIR/{output}
         """
 
 rule sqanti_qc:
@@ -357,22 +356,24 @@ rule sqanti_qc:
     conda:
         "envs/sqanti3.yaml"
     params:
-        addtl_opt = "--force_id_ignore --skipORF --report both ",
-        sj_files = config["short_read_splice_junctions"],
+        sqanti = config["sqanti_path"],
+        addtl_opt = "--force_id_ignore --skipORF --report pdf ",
+        sj_files = lambda wc: ",".join(config["short_read_splice_junctions"]),
         out_dir = lambda wc, output: dirname(output[0]),
         cage_path = config["CAGE_peaks"],
-        polya_motifs = config["polyA_motifs"]
-    threads: 12
+        polya_motifs = config["polyA_motifs"],
+        cupcake_path = config["cDNA_cupcake_path"]
+    threads: 8
     resources:
         mem_mb = 8000
     shell:
         """
-        python workflow/scripts/sqanti3_qc.py \
+        export PYTHONPATH={params.cupcake_path}/sequence/
+        export PYTHONPATH=$PYTHONPATH:{params.cupcake_path}/
+        python {params.sqanti}/sqanti3_qc.py \
         {input.isoforms} {input.annot} {input.genome} \
-        --cage_peak CAGE_PEAK \
-        --polyA_motif_list POLYA_MOTIF_LIST \
-        -t {threads} \
-        -n {threads} \
+        --cage_peak {params.cage_path} \
+        --polyA_motif_list {params.polya_motifs} \
         -d {params.out_dir} \
         -o {wildcards.dataset} \
         -c {params.sj_files} \

@@ -25,8 +25,8 @@ dependencies:
   - pybedtools
   - pysam
   - python>=3.7.6
-  - r>=3.6.0
-  - r-biocmanager
+  - r==3.6.0 # pin R version instead... 
+  - r-biocmanager 
   - r-dplyr
   - r-ggplot2
   - r-ggplotify

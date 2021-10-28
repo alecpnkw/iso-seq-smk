@@ -11,8 +11,10 @@ short_read_splice_junctions:
   - ../star-rsem/results/star-pe/MP65-rep1_GRCh38/SJ.out.tab
   - ../star-rsem/results/star-pe/MP65-rep2_GRCh38/SJ.out.tab
 CAGE_peaks:
-  - /hpc/users/pankoa01/opt/SQANTI3/data/ref_TSS_annotation/human.refTSS_v3.1.hg38.bed"
+  - "/hpc/users/pankoa01/opt/SQANTI3/data/ref_TSS_annotation/human.refTSS_v3.1.hg38.bed"
 polyA_motifs:
   - "/hpc/users/pankoa01/opt/SQANTI3/data/polyA_motifs/mouse_and_human.polyA_motif.txt"
 cDNA_cupcake_path: 
   - "/hpc/users/pankoa01/opt/cDNA_Cupcake"
+sqanti_path:
+  - "/hpc/users/pankoa01/opt/SQANTI3"
