@@ -47,7 +47,7 @@ rule sqanti_qc:
         "results/cDNA_cupcake_build.done",
         isoforms = "results/talon/{dataset}_talon.gtf",
         annot = config["annotation"],
-        genome = "results/renamed_ref/{dataset}_renamed.fa" # pass in renamed chr for consistency
+        genome = lambda wc: "results/renamed_ref/{0}".format(basename(config["reference"])) # pass in renamed chr for consistency
     output:
         "results/sqanti3/{dataset}/{dataset}_corrected.gtf"
     conda:

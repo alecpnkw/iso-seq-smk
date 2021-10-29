@@ -11,7 +11,7 @@ if config.get("short_read_splice_junctions", None) is not None:
 # this looks like it pulls the first field of the chr names...
 rule rename_fasta_chromosomes:
     input: config["reference"]
-    output: "results/renamed_ref/{dataset}_renamed.fa"
+    output: "results/renamed_ref/{reference}.fa"
     shell:
         """
         cut -d ' ' -f1 {input} > {output}
@@ -37,7 +37,7 @@ def transcriptclean_cmd(config):
 def TC_INPUT(wc):
     inputs = [
         "results/minimap2_filt/{sample}.sam",
-        "results/renamed_ref/{dataset}_renamed.fa"
+        "results/renamed_ref/{0}".format(basename(config["reference"]))
         ]
     if config.get("short_read_splice_junctions", None) is not None:
         inputs.append("results/merge_sjs/SJ.merged.tab")
