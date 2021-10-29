@@ -92,3 +92,13 @@ rule filtered_GTF:
         --build {wildcards.dataset} \
         --o {params.output_prefix}
         """
+
+rule summarize_transcriptome:
+    input:
+        "results/filter_transcriptome/{dataset}_abundance.tsv"
+    output:
+        "results/filter_transcriptome/{dataset}_summary.html",
+    conda:
+        "../envs/R.yaml"
+    script:
+        "scripts/summarize_transcriptome.Rmd"

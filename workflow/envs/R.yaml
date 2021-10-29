@@ -1,0 +1,6 @@
+channels:
+  - r
+  - defaults
+dependencies:
+  - R>=3.6
+  - r-tidyverse

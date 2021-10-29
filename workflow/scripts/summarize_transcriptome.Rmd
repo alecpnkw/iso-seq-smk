@@ -1,0 +1,79 @@
+---
+title: 'Filtered .gtf summary'
+output:
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+
+```{r}
+# imports
+require(readr)
+require(dplyr)
+require(ggplot2)
+
+colors <- c('#94D2ED', '#EECD92', '#6CA370', '#CA8667', '#A0A0A0', '#D7A4C6')
+
+# read in data
+talon <- readr::read_delim(
+  snakemake@input[[1]],
+  delim = '\t',
+  col_types = "ddccccddfff"
+  )
+
+fl.counts <- talon %>% 
+  select(`transcript_ID`, 12:ncol(.)) %>%
+  pivot_longer(2:ncol(.), names_to = "dataset", values_to = "n") %>%
+  group_by(transcript_ID) %>%
+  summarise(
+    fl.count = sum(n),
+    n.datasets = sum(n > 0)
+    )
+
+talon.jdf <- left_join(talon, fl.counts, by = "transcript_ID")
+
+talon.summary <- talon.jdf %>% 
+  group_by(transcript_novelty) %>%
+  summarise(n.transcripts = n(), 
+            `n.datasets=1` = sum(n.datasets == 1),
+            `n.datasets=2` = sum(n.datasets == 2),
+            `n.datasets=3` = sum(n.datasets == 3),
+            fl.count.mean = mean(fl.count),
+            fl.count.geomean = exp(mean(log(fl.count)))
+            )
+
+talon.summary
+```
+
+### Boxplots
+
+```{r}
+ggplot(talon.jdf, aes(transcript_novelty, fl.count)) + 
+  geom_boxplot() + 
+  theme_minimal() + 
+  scale_y_log10()
+```
+
+```{r}
+ggplot(talon.jdf, aes(transcript_novelty, fl.count, color = n.datasets %>% as.factor())) + 
+  geom_boxplot() + 
+  theme_minimal() + 
+  scale_y_log10() + scale_color_discrete(type = colors)
+```
+
+### Barplots
+
+```{r}
+talon.jdf %>% 
+  ggplot(., aes(transcript_novelty, fill = n.datasets %>% as.factor())) + geom_bar() + theme_minimal() + scale_fill_discrete(type = colors)
+```
+
+### Scatter plots
+
+```{r}
+ggplot(talon.summary, aes(n.transcripts, fl.count.mean, color = transcript_novelty)) + geom_point(size = 2.5) + scale_color_discrete(type=colors) + theme_minimal()
+```
+
+```{r}
+ggplot(talon.summary, aes(n.transcripts, fl.count.geomean, color = transcript_novelty)) + geom_point(size = 2.5) + scale_color_discrete(type=colors) + theme_minimal()
+```

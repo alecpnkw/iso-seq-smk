@@ -90,3 +90,6 @@ filtered_GTF:
 filtered_abundance:
   - "-W 03:00"
   - "-R rusage[mem=10000]"
+
+summarize_transcriptome:
+  - "-R rusage[mem=3000]"
