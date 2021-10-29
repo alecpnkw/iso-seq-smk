@@ -174,7 +174,7 @@ rule talon_GTF:
         """
         talon_create_GTF \
         --db {input[0]} \
-        --whitelist {input[1]} \`
+        --whitelist {input[1]} \
         -a {params.annot} \
         --build {wildcards.dataset} \
         --o {params.output_prefix}

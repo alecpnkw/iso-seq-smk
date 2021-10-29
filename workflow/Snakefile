@@ -15,7 +15,7 @@ rule all:
         expand("results/talon/{dataset}_talon.gtf", dataset = samples["dataset"]),
         expand("results/talon/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
         expand("results/sqanti3/{dataset}/{dataset}_corrected.gtf", dataset = samples["dataset"]),
-        expand("results/filter_transcriptome/{dataset}_whitelist.csv", dataset = samples["dataset"]),
+        expand("results/filter_transcriptome/{dataset}_talon.gtf", dataset = samples["dataset"]),
         "results/multiqc/multiqc-report.html"
 
 # Todo: add intial PacBio processing... 

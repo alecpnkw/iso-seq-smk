@@ -78,3 +78,15 @@ cDNA_cupcake_init:
   - "-q express"
   - "-W 1:00"
   - "-R rusage[mem=5000]"
+
+filter_transcriptome:
+  - "-q express"
+  - "-W 1:00"
+  - "-R rusage[mem=3000]"
+
+filtered_GTF:
+  - "-R rusage[mem=10000]"
+
+filtered_abundance:
+  - "-W 03:00"
+  - "-R rusage[mem=10000]"
