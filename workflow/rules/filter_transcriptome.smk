@@ -47,7 +47,7 @@ rule filtered_abundance:
         "results/talon/{dataset}_gene_models.db",
         "results/filter_transcriptome/{dataset}_whitelist.csv"
     output: 
-        "results/filter_transcriptome/{dataset}_abundance.tsv"
+        "results/filter_transcriptome/{dataset}_talon_abundance_filtered.tsv" # This name suffix can't be changed!
     conda:
         "../envs/talon.yaml"
     threads:
@@ -56,7 +56,7 @@ rule filtered_abundance:
         mem_mb = 5000
     params:
         annot = basename(config["annotation"]),
-        output_prefix = lambda wc, output: output[0].split("_abundance.tsv")[0]
+        output_prefix = lambda wc, output: output[0].split("_abundance_filtered.tsv")[0]
     shell:
         """
         talon_abundance \
@@ -95,10 +95,10 @@ rule filtered_GTF:
 
 rule summarize_transcriptome:
     input:
-        "results/filter_transcriptome/{dataset}_abundance.tsv"
+        "results/filter_transcriptome/{dataset}_talon_abundance_filtered.tsv"
     output:
-        "results/filter_transcriptome/{dataset}_summary.html",
+        "results/filter_transcriptome/{dataset}_summary.nb.html",
     conda:
         "../envs/R.yaml"
     script:
-        "scripts/summarize_transcriptome.Rmd"
+        "../scripts/summarize_transcriptome.Rmd"

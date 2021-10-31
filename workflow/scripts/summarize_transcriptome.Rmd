@@ -11,6 +11,7 @@ output:
 require(readr)
 require(dplyr)
 require(ggplot2)
+require(tidyr)
 
 colors <- c('#94D2ED', '#EECD92', '#6CA370', '#CA8667', '#A0A0A0', '#D7A4C6')
 
