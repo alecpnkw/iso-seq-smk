@@ -5,19 +5,20 @@ rule update_sqlite:
     output:
         touch("results/talon/{dataset}_sqanti3_annotations.done")
     resources:
-        mem_mb = 3000
+        mem_mb = 5000
     run:
         import pandas as pd
         import sqlite3
 
         # connect to SQLite
         con = sqlite3.connect(input[1])
-        transcripts = pd.read_sql_query("SELECT transcript_ID, gene_ID from transcripts", con)
+        transcripts = pd.read_sql_query("SELECT `ID`, `value` AS `transcript_ID` FROM `transcript_annotations` WHERE (`attribute` = 'transcript_id')", con)
 
         cols = ["isoform", "associated_gene", "associated_transcript", "structural_category", "subcategory", "min_cov"]
-        sqanti = pd.read_table(input[0], sep = '\t').loc[cols]
-        sqanti_transcripts = pd.merge(transcripts, sqanti, left_on = "transcript_ID", right_on = "isoform", kind = "left")
+        sqanti = pd.read_table(input[0], sep = '\t').loc[:,cols]
+        sqanti_transcripts = pd.merge(transcripts, sqanti, left_on = "transcript_ID", right_on = "isoform", how = "left")
         sqanti_transcripts.to_sql("sqanti_annotations", con, index = False)
+        con.close()
 
 rule filter_transcriptome:
     input:
@@ -28,7 +29,8 @@ rule filter_transcriptome:
         "results/filter_transcriptome/{dataset}_whitelist.csv"
     params:
         minFracA = 0.5,
-        minCov = 3
+        minCov = 3,
+        minSJCov = 3
     resources:
         mem_mb = 3000
     run:
@@ -53,7 +55,7 @@ rule filter_transcriptome:
         ) AND `transcript_ID` IN (
             SELECT DISTINCT `transcript_ID`
                 FROM sqanti_annotations
-                WHERE (`min_cov` >= :minCoV)
+                WHERE (`min_cov` >= :minSJCoV)
         )
         """
 
@@ -63,7 +65,7 @@ rule filter_transcriptome:
 
         # execute and write
         with open(output[0], 'w') as o:
-            for row in cur.execute(query, {"minFracA": params["minFracA"], "minCov": params["minCov"]}):
+            for row in cur.execute(query, {"minFracA": params["minFracA"], "minCov": params["minCov"], "minSJCoV": params["minSJCov"]}):
                 o.write("{0},{1}\n".format(row[0], row[1]))
         
         con.close()

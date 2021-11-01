@@ -17,7 +17,7 @@ rule all:
         expand("results/sqanti3/{dataset}/{dataset}_corrected.gtf", dataset = samples["dataset"]),
         expand(["results/filter_transcriptome/{dataset}_talon.gtf",
         "results/filter_transcriptome/{dataset}_talon_abundance_filtered.tsv",
-        "results/filter_transcriptome/{dataset}_summary.html"], dataset = samples["dataset"]),
+        "results/filter_transcriptome/{dataset}_summary.nb.html"], dataset = samples["dataset"]),
         "results/multiqc/multiqc-report.html"
 
 # Todo: add intial PacBio processing... 
