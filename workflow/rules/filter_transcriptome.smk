@@ -85,7 +85,7 @@ rule filtered_abundance:
         mem_mb = 5000
     params:
         annot = basename(config["annotation"]),
-        output_prefix = lambda wc, output: output[0].split("_abundance_filtered.tsv")[0]
+        output_prefix = lambda wc, output: output[0].split("_talon_abundance_filtered.tsv")[0]
     shell:
         """
         talon_abundance \

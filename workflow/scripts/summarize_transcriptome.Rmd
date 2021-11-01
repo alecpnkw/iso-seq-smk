@@ -1,12 +1,15 @@
 ---
-title: 'Filtered .gtf summary'
 output:
   html_notebook: default
   html_document:
     df_print: paged
 ---
 
-```{r}
+---
+title: "Filtered .gtf summary: `r snakemake@wildcards[["dataset"]]`"
+---
+
+```{r, message = F, warning = F}
 # imports
 require(readr)
 require(dplyr)
