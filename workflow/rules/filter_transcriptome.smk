@@ -53,7 +53,7 @@ rule filter_transcriptome:
                 GROUP BY `transcript_ID`)
                 WHERE (`n` >= :minCov)
         ) AND `transcript_ID` IN (
-            SELECT DISTINCT `transcript_ID`
+            SELECT DISTINCT `ID`
                 FROM sqanti_annotations
                 WHERE (`min_cov` >= :minSJCoV)
         )
