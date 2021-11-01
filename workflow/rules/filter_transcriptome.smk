@@ -28,9 +28,9 @@ rule filter_transcriptome:
     output:
         "results/filter_transcriptome/{dataset}_whitelist.csv"
     params:
-        minFracA = 0.5,
-        minCov = 3,
-        minSJCov = 3
+        minFracA = config["minFracA"],
+        minCov = config["minCov"],
+        minSJCov = config["minSJCov"]
     resources:
         mem_mb = 3000
     run:

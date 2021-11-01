@@ -9,6 +9,8 @@ output:
 title: "Filtered .gtf summary: `r snakemake@wildcards[["dataset"]]`"
 ---
 
+### Config
+
 ```{r, message = F, warning = F}
 # imports
 require(readr)
@@ -16,6 +18,17 @@ require(dplyr)
 require(ggplot2)
 require(tidyr)
 
+samples <- readr::read_delim(snakemake@config[["samples"]], delim = '\t')
+samples
+```
+
+```{r}
+print(paste("minFracA:",snakemake@config[["minFracA"]]))
+print(paste("minCov:",snakemake@config[["minCov"]]))
+print(paste("minSJCov:",snakemake@config[["minSJCov"]]))
+```
+
+```{r, message = F, warning = F}
 colors <- c('#94D2ED', '#EECD92', '#6CA370', '#CA8667', '#A0A0A0', '#D7A4C6')
 
 # read in data
