@@ -1,7 +1,29 @@
+rule update_sqlite:
+    input:
+        "results/sqanti3/{dataset}/{dataset}_classification.txt",
+        "results/talon/{dataset}_gene_models.db"
+    output:
+        touch("results/talon/{dataset}_sqanti3_annotations.done")
+    resources:
+        mem_mb = 3000
+    run:
+        import pandas as pd
+        import sqlite3
+
+        # connect to SQLite
+        con = sqlite3.connect(input[1])
+        transcripts = pd.read_sql_query("SELECT transcript_ID, gene_ID from transcripts", con)
+
+        cols = ["isoform", "associated_gene", "associated_transcript", "structural_category", "subcategory", "min_cov"]
+        sqanti = pd.read_table(input[0], sep = '\t').loc[cols]
+        sqanti_transcripts = pd.merge(transcripts, sqanti, left_on = "transcript_ID", right_on = "isoform", kind = "left")
+        sqanti_transcripts.to_sql("sqanti_annotations", con, index = False)
+
 rule filter_transcriptome:
     input:
         "results/talon/{dataset}_gene_models.db",
-        "results/sqanti3/{dataset}/{dataset}_corrected.gtf"
+        "results/sqanti3/{dataset}/{dataset}_corrected.gtf",
+        "results/talon/{dataset}_sqanti3_annotations.done"
     output:
         "results/filter_transcriptome/{dataset}_whitelist.csv"
     params:
@@ -28,7 +50,12 @@ rule filter_transcriptome:
                 WHERE (`fraction_As` >= :minFracA)
                 GROUP BY `transcript_ID`)
                 WHERE (`n` >= :minCov)
-        )"""
+        ) AND `transcript_ID` IN (
+            SELECT DISTINCT `transcript_ID`
+                FROM sqanti_annotations
+                WHERE (`min_cov` >= :minCoV)
+        )
+        """
 
         # connect to SQLite
         con = sqlite3.connect(input[0])

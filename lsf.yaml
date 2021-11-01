@@ -79,6 +79,11 @@ cDNA_cupcake_init:
   - "-W 1:00"
   - "-R rusage[mem=5000]"
 
+update_sqlite:
+  - "-q express"
+  - "-W 1:00"
+  - "-R rusage[mem=3000]"
+
 filter_transcriptome:
   - "-q express"
   - "-W 1:00"

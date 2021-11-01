@@ -49,7 +49,8 @@ rule sqanti_qc:
         annot = config["annotation"],
         genome = lambda wc: "results/renamed_ref/{0}".format(basename(config["reference"])) # pass in renamed chr for consistency
     output:
-        "results/sqanti3/{dataset}/{dataset}_corrected.gtf"
+        "results/sqanti3/{dataset}/{dataset}_corrected.gtf",
+        "results/sqanti3/{dataset}/{dataset}_classification.txt"
     conda:
         "../envs/sqanti3.yaml"
     params:
