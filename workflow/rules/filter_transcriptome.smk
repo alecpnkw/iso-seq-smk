@@ -27,36 +27,35 @@ rule filter_transcriptome:
         "results/talon/{dataset}_sqanti3_annotations.done"
     output:
         "results/filter_transcriptome/{dataset}_whitelist.csv"
-    params:
-        minFracA = config["minFracA"],
-        minCov = config["minCov"],
-        minSJCov = config["minSJCov"]
     resources:
         mem_mb = 3000
     run:
         import sqlite3
         # using named style
         query = """
-        SELECT `gene_ID`, `transcript_ID` FROM transcripts
-        WHERE `transcript_ID` NOT IN (
-            SELECT DISTINCT `ID`
-                FROM `transcript_annotations`
-                WHERE (
-                    (`attribute` = 'ISM_transcript' AND `value` = 'TRUE') 
-                    OR (`attribute` = 'genomic_transcript' AND `value` = 'TRUE')
-                )
-        ) AND `transcript_ID` IN (
-            SELECT DISTINCT `transcript_ID`
-                FROM (SELECT `transcript_ID`, COUNT(*) AS `n`
-                FROM `observed`
-                WHERE (`fraction_As` >= :minFracA)
-                GROUP BY `transcript_ID`)
-                WHERE (`n` >= :minCov)
-        ) AND `transcript_ID` IN (
-            SELECT DISTINCT `ID`
-                FROM sqanti_annotations
-                WHERE (`min_cov` >= :minSJCoV)
-        )
+        SELECT gene_ID, t.transcript_ID, transcript_novelty, n_exons, min_cov, n, avg_fraction_As
+        FROM transcripts t
+        LEFT JOIN (SELECT ID, CASE 
+        WHEN sum(`attribute` = 'transcript_status' AND `value` = 'KNOWN') > 0 THEN 'KNOWN'
+        WHEN sum(`attribute` = 'ISM_transcript' AND `value` = 'TRUE') > 0 THEN 'ISM'
+        WHEN sum(`attribute` = 'NIC_transcript' AND `value` = 'TRUE') > 0 THEN 'NIC'
+        WHEN sum(`attribute` = 'NNC_transcript' AND `value` = 'TRUE') > 0 THEN 'NNC'
+        WHEN sum(`attribute` = 'intergenic_transcript' AND `value` = 'TRUE') > 0 THEN 'intergenic'
+        WHEN sum(`attribute` = 'antisense_transcript' AND `value` = 'TRUE') > 0 THEN 'antisense'
+        WHEN sum(`attribute` = 'genomic_transcript' AND `value` = 'TRUE') > 0 THEN 'genomic'
+        ELSE 'OTHER_NOVEL' END 
+        AS `transcript_novelty`
+        FROM transcript_annotations
+        GROUP BY `ID`) a ON t.transcript_ID=a.ID
+        LEFT JOIN sqanti_annotations s ON t.transcript_ID=s.ID
+        LEFT JOIN (SELECT t.transcript_ID, COUNT(*) as `n`, AVG(o.fraction_As) as avg_fraction_As
+            FROM transcripts t
+            LEFT JOIN observed o ON o.transcript_ID=t.transcript_ID
+            WHERE o.fraction_As <= 0.5
+            GROUP BY t.transcript_ID, `n_exons`) o ON t.transcript_ID=o.transcript_ID
+        WHERE `transcript_novelty` NOT IN ('genomic', 'ISM') 
+        AND (`min_cov` >= 5 OR `n_exons` = 1)
+        AND ((`n` >= 1 AND `transcript_novelty` == 'KNOWN') OR (`n` >= 5 AND `transcript_novelty` != 'KNOWN'))
         """
 
         # connect to SQLite
@@ -65,7 +64,7 @@ rule filter_transcriptome:
 
         # execute and write
         with open(output[0], 'w') as o:
-            for row in cur.execute(query, {"minFracA": params["minFracA"], "minCov": params["minCov"], "minSJCoV": params["minSJCov"]}):
+            for row in cur.execute(query):
                 o.write("{0},{1}\n".format(row[0], row[1]))
         
         con.close()
