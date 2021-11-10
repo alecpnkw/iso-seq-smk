@@ -55,7 +55,11 @@ rule filter_transcriptome:
             GROUP BY t.transcript_ID, `n_exons`) o ON t.transcript_ID=o.transcript_ID
         WHERE `transcript_novelty` NOT IN ('genomic', 'ISM') 
         AND (`min_cov` >= 5 OR `n_exons` = 1)
-        AND ((`n` >= 1 AND `transcript_novelty` == 'KNOWN') OR (`n` >= 5 AND `transcript_novelty` != 'KNOWN'))
+        AND (
+            (`n` >= 1 AND `transcript_novelty` == 'KNOWN') 
+            OR (`n` >= 2 AND `transcript_novelty` IN ('NIC', 'NNC'))
+            OR (`n` >= 3 AND `transcript_novelty` IN ('intergenic', 'antisense'))
+            )
         """
 
         # connect to SQLite
