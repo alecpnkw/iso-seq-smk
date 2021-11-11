@@ -6,9 +6,9 @@ if config.get("short_read_splice_junctions", None) is not None:
         output:
             "results/merge_sjs/SJ.merged.tab"
         conda: 
-            "../R/yaml"
+            "../envs/R.yaml"
         script:
-            merge_sjs.R
+            "scripts/merge_sjs.R"
 
 
 # this looks like it pulls the first field of the chr names...
