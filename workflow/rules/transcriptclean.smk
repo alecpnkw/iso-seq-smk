@@ -5,8 +5,11 @@ if config.get("short_read_splice_junctions", None) is not None:
             config["short_read_splice_junctions"]
         output:
             "results/merge_sjs/SJ.merged.tab"
-        shell:
-            "cat {input} > {output}"
+        conda: 
+            "../R/yaml"
+        script:
+            merge_sjs.R
+
 
 # this looks like it pulls the first field of the chr names...
 rule rename_fasta_chromosomes:
