@@ -3,7 +3,8 @@ library(readr)
 library(purrr)
 
 colnames <- c("chr", "start", "end", "strand", "motif", "annot", "n_unique", "n_multi", "max_overhang") 
-cat.sjs <- map_dfr(snakemake@input, readr::read_tsv(col_names = colnames))
+coltypes = "cdddddddd"
+cat.sjs <- map_dfr(snakemake@input, ~ readr::read_tsv(.x, col_names = colnames, col_types = coltypes))
 sum.sjs <- cat.sjs %>% 
     group_by(chr, start, end, strand, motif, annot) %>%
     summarise(
@@ -13,4 +14,4 @@ sum.sjs <- cat.sjs %>%
         ) %>% 
         arrange(chr, start)
 
-readr::write(sum.sjs, snakemake@output[[1]])
+readr::write_tsv(sum.sjs, snakemake@output[[1]], col_names = F)

@@ -4,11 +4,11 @@ if config.get("short_read_splice_junctions", None) is not None:
         input:  
             config["short_read_splice_junctions"]
         output:
-            "results/merge_sjs/SJ.merged.tab"
+            "results/merge_sjs/{dataset}/SJ.merged.tab"
         conda: 
             "../envs/R.yaml"
         script:
-            "scripts/merge_sjs.R"
+            "../scripts/merge_sjs.R"
 
 
 # this looks like it pulls the first field of the chr names...
@@ -43,7 +43,7 @@ def TC_INPUT(wc):
         "results/renamed_ref/{0}".format(basename(config["reference"]))
         ]
     if config.get("short_read_splice_junctions", None) is not None:
-        inputs.append("results/merge_sjs/SJ.merged.tab")
+        inputs.append("results/merge_sjs/{dataset}/SJ.merged.tab")
     return inputs
 
 TC_SHELL = transcriptclean_cmd(config)
