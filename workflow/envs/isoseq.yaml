@@ -1,0 +1,10 @@
+name: isoseq
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - isoseq
+  - lima
+  - pbmm2
+  - pbpigeion

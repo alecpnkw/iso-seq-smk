@@ -6,28 +6,113 @@ min_version("6.0")
 configfile: "config/config.yaml"
 localrules: all, cDNA_cupcake_init # needs to be executed on login node to download packages...
 
-samples = pd.read_csv(config["samples"], sep = '\t').set_index("sample", drop=False)
+samples = pd.read_csv(config["samples"], sep = ' ').set_index("sample", drop=False)
+print(samples)
 
 # targeting...
 rule all:
     input:
-        #outputs from TALON... 
-        expand("results/talon/{dataset}_talon.gtf", dataset = samples["dataset"]),
-        expand("results/talon/{dataset}_talon_abundance_filtered.tsv", dataset = samples["dataset"]),
-        expand("results/sqanti3/{dataset}/{dataset}_corrected.gtf", dataset = samples["dataset"]),
-        expand(["results/filter_transcriptome/{dataset}_talon.gtf",
-        "results/filter_transcriptome/{dataset}_talon_abundance_filtered.tsv",
-        "results/filter_transcriptome/{dataset}_summary.nb.html"], dataset = samples["dataset"]),
+        "results/pbmm2/mapped.bam",
         "results/multiqc/multiqc-report.html"
 
 # Todo: add intial PacBio processing... 
 
 def INPUT_BAM(wc):
-    return samples.loc[wc.sample, "input_bam"]
+	return samples.loc[wc.sample, "input_bam"]
 
-include: "rules/map.smk"
-include: "rules/transcriptclean.smk"
-include: "rules/talon.smk"
-include: "rules/sqanti3.smk"
-include: "rules/filter_transcriptome.smk"
+# removing these modules for now and focusing on the PacBio workflow
+#include: "rules/map.smk"
+#include: "rules/transcriptclean.smk"
+#include: "rules/talon.smk"
+#include: "rules/sqanti3.smk"
+#include: "rules/filter_transcriptome.smk"
 include: "rules/multiqc.smk"
+
+# Rules here from the recommended PacBio bulk Iso-Seq workflow: https://isoseq.how/getting-started.html
+
+# unclear what the proper barcoding primer set is here, so defaulting to the v2 set for now...
+# the goal here is for demultiplexing and to remove primer sequences
+rule lima:
+    input: INPUT_BAM
+    output: 
+        "results/lima/{sample}.fl.bam"
+    conda: 
+        "../envs/isoseq.yaml"
+    params:
+        primers=config["pacbio_primers"]
+    shell:
+        """
+        lima {input} {params.primers} {output} --isoseq --peek-guess
+        """
+
+rule isoseq_refine:
+    input: "results/lima/{sample}.fl.bam"
+    output: 
+        "results/isoseq_refine/{sample}.flnc.bam",
+        "results/isoseq_refine/{sample}.flnc.transcriptset.xml"
+    conda: 
+        "../envs/isoseq.yaml"
+    shell:
+        """
+        isoseq refine {input} {output[0]} --transcriptset {output[1]} --require-polya
+        """
+
+# using the new isoseq cluster2 command
+# output by default requires support of 2 flnc reads
+rule isoseq_cluster:
+    input: 
+        expand("results/isoseq_refine/{sample}.flnc.bam", sample = samples.index)
+    output:
+        "results/isoseq_cluster/clustered.bam",
+        "results/isoseq_cluster/clustered.bam.pbi",
+        "results/isoseq_cluster/clustered.transcriptset.xml"
+    conda: 
+        "../envs/isoseq.yaml"
+    shell:
+        """
+        isoseq cluster2 {input} {output[0]}
+        """
+
+rule pbmm2_align:
+    input: 
+        ref = config["reference"],
+        bam = "results/isoseq_cluster/clustered.bam"
+    output: "results/pbmm2/mapped.bam"
+    conda: 
+        "../envs/isoseq.yaml"
+    shell:
+        """
+        pbmm2 align --preset ISOSEQ --sort {input.bam} {input.ref} {output}
+        """
+
+#rule isoseq_collapse:
+#    input: "results/pbmm2/{sample}.bam"
+#    output: 
+#      - "results/isoseq_collapse/{sample}.collapsed.bam"
+#      - "results/isoseq_collapse/{sample}.collapsed.transcriptset.xml"
+#    conda: 
+#        "../envs/isoseq.yaml"
+#    shell:
+#        """
+#        isoseq collapse {input} {output[0]} --transcriptset {output[1]} --require-polya
+#        """
+#
+#rule pigeon_classify:
+#    input: "results/isoseq_collapse/{sample}.collapsed.bam"
+#    output: "results/pigeon/{sample}.classified.bam"
+#    conda: 
+#        "../envs/isoseq.yaml"
+#    shell:
+#        """
+#        pbpigeon classify {input} {output} --transcriptset results/isoseq_collapse/{wildcards.sample}.collapsed.transcriptset.xml
+#        """
+#
+#rule pigeon_filter:
+#    input: "results/pigeon/{sample}.classified.bam"
+#    output: "results/pigeon/{sample}.filtered.bam"
+#    conda: 
+#        "../envs/isoseq.yaml"
+#    shell:
+#        """
+#        pbpigeon filter {input} {output} --transcriptset results/isoseq_collapse/{wildcards.sample}.collapsed.transcriptset.xml
+#        """

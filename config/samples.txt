@@ -1,0 +1,2 @@
+sample replicate dataset source input_bam
+sample1 1 hae_ifn unk resources/dummy-movie.bam

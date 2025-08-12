@@ -1,15 +1,12 @@
-samples: "config/samples.tsv"
-reference: "../resources/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa"
-annotation: "../resources/Homo_sapiens.GRCh38.104.gtf"
+samples: "config/samples.txt"
+reference: "resources/SIRV.fa"
+annotation: "resources/SIRV_annotation.gtf"
+pacbio_primers: "resources/pacbio_primers.fasta"
+
+# not used for now...
 transcriptclean_path: "/hpc/users/pankoa01/opt/TranscriptClean/TranscriptClean.py"
-require_short_read_validation: true
 short_read_splice_junctions:
-  - ../star-rsem/results/star-pe/92-1-rep1_GRCh38/SJ.out.tab
-  - ../star-rsem/results/star-pe/92-1-rep2_GRCh38/SJ.out.tab
-  - ../star-rsem/results/star-pe/MEL202-rep1_GRCh38/SJ.out.tab
-  - ../star-rsem/results/star-pe/MEL202-rep2_GRCh38/SJ.out.tab
-  - ../star-rsem/results/star-pe/MP65-rep1_GRCh38/SJ.out.tab
-  - ../star-rsem/results/star-pe/MP65-rep2_GRCh38/SJ.out.tab
+  - "resources/out.SJ.tab"
 CAGE_peaks:
   - "/hpc/users/pankoa01/opt/SQANTI3/data/ref_TSS_annotation/human.refTSS_v3.1.hg38.bed"
 polyA_motifs:
