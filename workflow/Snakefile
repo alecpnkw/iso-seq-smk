@@ -1,10 +1,11 @@
 from snakemake.utils import min_version
 import pandas as pd
 from os.path import dirname, basename
+from pathlib import Path
 min_version("8.0")
 
 configfile: "config/config.yaml"
-localrules: all, multiqc, tabulate_flnc, cDNA_cupcake_init # needs to be executed on login node to download packages...
+localrules: all, multiqc, tabulate_flnc, fetch_SQANTI3_CAGE_peaks # needs to be executed on login node to download packages...
 
 samples = pd.read_csv(config["samples"], sep = ' ').set_index("sample", drop=False)
 print(samples)
@@ -12,7 +13,8 @@ print(samples)
 # targeting...
 rule all:
     input:
-        "results/pbmm2/mapped.bam",
+        "results/isoseq_collapse/collapsed.gff",
+        "results/pigeon/sample_filtered.classification.txt",
         "results/multiqc/multiqc-report.html"
 
 # Todo: add intial PacBio processing... 
@@ -101,34 +103,70 @@ rule pbmm2_align:
         pbmm2 align --preset ISOSEQ --sort -j 12 -m 3000M {input.bam} {input.ref} {output}
         """
 
-#rule isoseq_collapse:
-#    input: "results/pbmm2/{sample}.bam"
-#    output: 
-#      - "results/isoseq_collapse/{sample}.collapsed.bam"
-#      - "results/isoseq_collapse/{sample}.collapsed.transcriptset.xml"
-#    conda: 
-#        "../envs/isoseq.yaml"
+rule isoseq_collapse:
+    input: "results/pbmm2/mapped.bam"
+    output: 
+        "results/isoseq_collapse/collapsed.gff",
+    conda: 
+        "envs/isoseq.yaml"
+    shell:
+        """
+        isoseq collapse --do-not-collapse-extra-5exons {input} {output}
+        """
+
+rule fetch_SQANTI3_CAGE_peaks:
+    output: "resources/human.refTSS_v3.1.hg38.bed"
+    params:
+        url = "https://raw.githubusercontent.com/ConesaLab/SQANTI3/refs/heads/master/data/ref_TSS_annotation/human.refTSS_v3.1.hg38.bed"
+    shell:
+        """
+        wget -O {output} {params.url}
+        """
+
+rule pigeon_prepare:
+    input:
+        cage_bed = "resources/human.refTSS_v3.1.hg38.bed",
+        collapsed_gff = "results/isoseq_collapse/collapsed.gff",
+        annotation = config["annotation"],
+        ref_fasta = config["reference"],
+    params:
+        prefix = "results/pigeon/sample"
+    output:
+        "results/isoseq_collapse/collapsed.sorted.gff",
+        "resources/human.refTSS_v3.1.hg38.sorted.bed"
+    conda: 
+        "envs/isoseq.yaml"
+    shell:
+        """
+        pigeon prepare {input.annotation} {input.ref_fasta} {input.cage_bed}
+        pigeon prepare {input.collapsed_gff}
+        """
+
+rule pigeon_classify:
+    input:
+        cage_bed = "resources/human.refTSS_v3.1.hg38.sorted.bed",
+        collapsed_gff = "results/isoseq_collapse/collapsed.sorted.gff",
+    params:
+        prefix = "results/pigeon/sample",
+        annotation = lambda wc: Path(config["annotation"]).with_suffix(".sorted.gtf"),
+        ref_fasta = config["reference"]
+    output:
+        "results/pigeon/sample_classification.txt",
+        "results/pigeon/sample_filtered.classification.txt"
+    conda: 
+        "envs/isoseq.yaml"
+    shell:
+        """
+        pigeon classify {input.collapsed_gff} -o {params.prefix} --cage-peak {input.cage_bed} {params.annotation} {params.ref_fasta}
+        pigeon filter {output[0]} --isoforms {input.collapsed_gff}
+        """
+
+#rule test:
+#    output: "results/test/{sample}.txt"
+#    conda:
+#        "envs/isoseq.yaml"
 #    shell:
 #        """
-#        isoseq collapse {input} {output[0]} --transcriptset {output[1]} --require-polya
-#        """
-#
-#rule pigeon_classify:
-#    input: "results/isoseq_collapse/{sample}.collapsed.bam"
-#    output: "results/pigeon/{sample}.classified.bam"
-#    conda: 
-#        "../envs/isoseq.yaml"
-#    shell:
-#        """
-#        pbpigeon classify {input} {output} --transcriptset results/isoseq_collapse/{wildcards.sample}.collapsed.transcriptset.xml
-#        """
-#
-#rule pigeon_filter:
-#    input: "results/pigeon/{sample}.classified.bam"
-#    output: "results/pigeon/{sample}.filtered.bam"
-#    conda: 
-#        "../envs/isoseq.yaml"
-#    shell:
-#        """
-#        pbpigeon filter {input} {output} --transcriptset results/isoseq_collapse/{wildcards.sample}.collapsed.transcriptset.xml
+#        touch {output}
+#        echo "Hello world" > {output}
 #        """
