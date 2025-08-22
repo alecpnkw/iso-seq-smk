@@ -2,4 +2,6 @@ results/*
 resources/*
 .snakemake/
 .snakemake/*
+logs/
 .Rproj*
+.RData

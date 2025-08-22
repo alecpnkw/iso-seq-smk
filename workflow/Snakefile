@@ -1,10 +1,10 @@
 from snakemake.utils import min_version
 import pandas as pd
 from os.path import dirname, basename
-min_version("6.0")
+min_version("8.0")
 
 configfile: "config/config.yaml"
-localrules: all, cDNA_cupcake_init # needs to be executed on login node to download packages...
+localrules: all, multiqc, tabulate_flnc, cDNA_cupcake_init # needs to be executed on login node to download packages...
 
 samples = pd.read_csv(config["samples"], sep = ' ').set_index("sample", drop=False)
 print(samples)
@@ -34,55 +34,71 @@ include: "rules/multiqc.smk"
 # the goal here is for demultiplexing and to remove primer sequences
 rule lima:
     input: INPUT_BAM
-    output: 
-        "results/lima/{sample}.fl.bam"
-    conda: 
-        "../envs/isoseq.yaml"
+    output:
+        "results/lima/{sample}.fl.NEB_5p--NEB_Clontech_3p.bam" # >95% match isoseq v1 clontech primers...
+    conda:
+        "envs/isoseq.yaml"
     params:
-        primers=config["pacbio_primers"]
+        primers = config["pacbio_primers"],
+        base_path = "results/lima/{sample}.fl.bam"
     shell:
         """
-        lima {input} {params.primers} {output} --isoseq --peek-guess
+        lima {input} {params.primers} {params.base_path} --isoseq --peek-guess
         """
 
 rule isoseq_refine:
-    input: "results/lima/{sample}.fl.bam"
-    output: 
-        "results/isoseq_refine/{sample}.flnc.bam",
-        "results/isoseq_refine/{sample}.flnc.transcriptset.xml"
+    input: "results/lima/{sample}.fl.NEB_5p--NEB_Clontech_3p.bam"
+    output: "results/isoseq_refine/{sample}.flnc.bam"
+    params:
+        primers = config["pacbio_primers"]
     conda: 
-        "../envs/isoseq.yaml"
+        "envs/isoseq.yaml"
     shell:
         """
-        isoseq refine {input} {output[0]} --transcriptset {output[1]} --require-polya
+        isoseq refine --require-polya {input} {params.primers} {output}
+        """
+
+rule tabulate_flnc:
+    input: expand("results/isoseq_refine/{sample}.flnc.bam", sample = samples.index)
+    output: "results/isoseq_refine/flnc.fofn"
+    shell:
+        """
+        cd $(dirname {output})
+        ls *.flnc.bam > $(basename {output})
         """
 
 # using the new isoseq cluster2 command
 # output by default requires support of 2 flnc reads
 rule isoseq_cluster:
-    input: 
-        expand("results/isoseq_refine/{sample}.flnc.bam", sample = samples.index)
+    input: "results/isoseq_refine/flnc.fofn"
     output:
-        "results/isoseq_cluster/clustered.bam",
-        "results/isoseq_cluster/clustered.bam.pbi",
-        "results/isoseq_cluster/clustered.transcriptset.xml"
+        "results/isoseq_refine/clustered.bam",
+        "results/isoseq_refine/clustered.bam.pbi",
+        "results/isoseq_refine/clustered.cluster_report.csv"
     conda: 
-        "../envs/isoseq.yaml"
+        "envs/isoseq.yaml"
+    threads: 16
+    log: "logs/lsf/isoseq_cluster.log"
+    resources:
+        mem_mb=128000
     shell:
         """
-        isoseq cluster2 {input} {output[0]}
+        isoseq cluster2 {input} {output[0]} > {log} 2>&1
         """
 
 rule pbmm2_align:
     input: 
         ref = config["reference"],
-        bam = "results/isoseq_cluster/clustered.bam"
+        bam = "results/isoseq_refine/clustered.bam"
     output: "results/pbmm2/mapped.bam"
     conda: 
-        "../envs/isoseq.yaml"
+        "envs/isoseq.yaml"
+    threads: 6
+    resources:
+        mem_mb = 48000
     shell:
         """
-        pbmm2 align --preset ISOSEQ --sort {input.bam} {input.ref} {output}
+        pbmm2 align --preset ISOSEQ --sort -j 12 -m 3000M {input.bam} {input.ref} {output}
         """
 
 #rule isoseq_collapse:

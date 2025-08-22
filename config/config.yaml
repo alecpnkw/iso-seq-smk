@@ -1,7 +1,7 @@
 samples: "config/samples.txt"
-reference: "resources/SIRV.fa"
-annotation: "resources/SIRV_annotation.gtf"
-pacbio_primers: "resources/pacbio_primers.fasta"
+reference: "/hpc/packages/minerva-centos7/cellranger/5.0.1/refdata-cellranger/refdata-gex-GRCh38-2020-A/fasta/genome.fa"
+annotation: "/hpc/packages/minerva-centos7/cellranger/5.0.1/refdata-cellranger/refdata-gex-GRCh38-2020-A/genes/genes.gtf"
+pacbio_primers: "config/isoseq_v1_primers.fasta"
 
 # not used for now...
 transcriptclean_path: "/hpc/users/pankoa01/opt/TranscriptClean/TranscriptClean.py"
