@@ -1,0 +1,10 @@
+name: talon-gffcompare
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - talon
+  - gffcompare
+  - gffread
+  - python

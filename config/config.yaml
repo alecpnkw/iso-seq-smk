@@ -3,6 +3,11 @@ reference: "resources/genome.fa" #"/hpc/packages/minerva-centos7/cellranger/5.0.
 annotation: "resources/genes.gtf" #"/hpc/packages/minerva-centos7/cellranger/5.0.1/refdata-cellranger/refdata-gex-GRCh38-2020-A/genes/genes.gtf"
 pacbio_primers: "config/isoseq_v1_primers.fasta"
 
+star_rsem:
+  samples: "config/samples-hae-ifn.tsv"
+  reference: "resources/genome.fa"
+  annotation: "resources/genes.gtf"
+
 # not used for now...
 transcriptclean_path: "/hpc/users/pankoa01/opt/TranscriptClean/TranscriptClean.py"
 short_read_splice_junctions:

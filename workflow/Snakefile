@@ -2,6 +2,8 @@ from snakemake.utils import min_version
 import pandas as pd
 from os.path import dirname, basename
 from pathlib import Path
+import scripts.gather_fastq
+
 min_version("8.0")
 
 configfile: "config/config.yaml"
@@ -9,15 +11,40 @@ localrules: all, multiqc, tabulate_flnc, fetch_SQANTI3_CAGE_peaks # needs to be 
 
 samples = pd.read_csv(config["samples"], sep = ' ').set_index("sample", drop=False)
 print(samples)
+short_read_samples = pd.read_csv(config["star_rsem"]["samples"], sep = ' ').set_index("sample", drop=False)
+print(short_read_samples)
 
 # targeting...
 rule all:
     input:
-        "results/isoseq_collapse/collapsed.gff",
-        "results/pigeon/sample_filtered.classification.txt",
+        "results/merged/merged_ref_isoseq.sorted.gtf",
+        expand("results/star-pe/{sample}/Aligned.sortedByCoord.out.bam", sample = short_read_samples.index),
+        "results/star_index_isoseq",
         "results/multiqc/multiqc-report.html"
 
-# Todo: add intial PacBio processing... 
+module star_rsem:
+    snakefile: github("alecpnkw/star-rsem", path="workflow/rules/star.smk", branch="dev")
+    config: config["star_rsem"]
+
+use rule star_index from star_rsem as sr_star_index with:
+    input: 
+        fasta = config["reference"],
+        gtf = "results/merged/merged_ref_isoseq.sorted.gtf"
+    output:
+        directory("results/star_index_isoseq")
+
+use rule star_pe_single from star_rsem as sr_star_pe_single with:
+    input:
+        genome = "results/star_index_isoseq",
+        R1 = lambda wc: short_read_samples.loc[wc.sample, "R1_fastq"], # directs to fastq files
+        R2 = lambda wc: short_read_samples.loc[wc.sample, "R2_fastq"]
+    params:
+        prefix = "results/star-pe/{sample}/",
+    output:
+        "results/star-pe/{sample}/Aligned.sortedByCoord.out.bam",
+        "results/star-pe/{sample}/Aligned.toTranscriptome.out.bam",
+        "results/star-pe/{sample}/SJ.out.tab",
+        "results/star-pe/{sample}/ReadsPerGene.out.tab"
 
 def INPUT_BAM(wc):
 	return samples.loc[wc.sample, "input_bam"]
@@ -152,7 +179,8 @@ rule pigeon_classify:
         ref_fasta = config["reference"]
     output:
         "results/pigeon/sample_classification.txt",
-        "results/pigeon/sample_filtered.classification.txt"
+        "results/pigeon/sample_classification.filtered_lite_classification.txt",
+        "results/isoseq_collapse/collapsed.sorted.filtered_lite.gff"
     conda: 
         "envs/isoseq.yaml"
     shell:
@@ -160,13 +188,45 @@ rule pigeon_classify:
         pigeon classify {input.collapsed_gff} -o {params.prefix} --cage-peak {input.cage_bed} {params.annotation} {params.ref_fasta}
         pigeon filter {output[0]} --isoforms {input.collapsed_gff}
         """
+# WIP
+rule merge_transcriptome:
+    input: "results/isoseq_collapse/collapsed.sorted.filtered_lite.gff"
+    output: 
+        clean = "results/merged/isoseq.longread.gtf",
+        annotated = "results/merged/isoseq.annotated.gtf",
+        novel = "results/merged/isoseq_novel.gtf",
+        merged = "results/merged/merged_ref_isoseq.gtf",
+        merged_sorted = "results/merged/merged_ref_isoseq.sorted.gtf"
+        
+    params:
+        annotation = config["annotation"]
+    conda: "envs/gffcompare.yaml"
+    shell:
+        """
+        # ensure is gtf-compatible
+        gffread {input} -T -o {output.clean}
 
-#rule test:
-#    output: "results/test/{sample}.txt"
-#    conda:
-#        "envs/isoseq.yaml"
-#    shell:
-#        """
-#        touch {output}
-#        echo "Hello world" > {output}
-#        """
+        # annotate
+        gffcompare -r {params.annotation} -o results/merged/isoseq {output.clean}
+
+        awk -F'\t' '
+        BEGIN{{OFS="\t"}}
+        $0 ~ /^#/ {{next}}
+        # capture class_code from attributes
+        {{
+            cc = "-"
+            if ($9 ~ /class_code "/) {{
+            match($9, /class_code "([^"]+)"/, m)
+            if (m[1] != "") cc = m[1]
+            }}
+            # Keep anything that is NOT an exact reference match
+            if (cc != "=") print
+        }}
+        ' {output.annotated} > {output.novel}
+
+        # merge
+        cat {params.annotation} {output.novel} > {output.merged}
+
+        # sort
+        gffread {output.merged} -E --sort-alpha -o- > {output.merged_sorted}
+        """
