@@ -3,6 +3,7 @@ resources/*
 .snakemake/
 .snakemake/*
 logs/
+scratch/
 *.log
 .Rproj*
 .RData

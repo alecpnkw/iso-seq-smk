@@ -18,18 +18,19 @@ print(short_read_samples)
 rule all:
     input:
         "results/merged/merged_ref_isoseq.sorted.gtf",
-        expand("results/star-pe/{sample}/Aligned.sortedByCoord.out.bam", sample = short_read_samples.index),
+        expand("results/rsem/{sample}/{sample}.isoforms.results", sample = short_read_samples.index),
+        "results/rsem-combined/isoseq_rsem_transcripts.tsv",
         "results/star_index_isoseq",
         "results/multiqc/multiqc-report.html"
 
 module star_rsem:
-    snakefile: github("alecpnkw/star-rsem", path="workflow/rules/star.smk", branch="dev")
+    snakefile: github("alecpnkw/star-rsem", path="workflow/Snakefile", branch="dev")
     config: config["star_rsem"]
 
 use rule star_index from star_rsem as sr_star_index with:
     input: 
         fasta = config["reference"],
-        gtf = "results/merged/merged_ref_isoseq.sorted.gtf"
+        gtf = "results/merged/merged_ref_isoseq.gtf"
     output:
         directory("results/star_index_isoseq")
 
@@ -45,6 +46,36 @@ use rule star_pe_single from star_rsem as sr_star_pe_single with:
         "results/star-pe/{sample}/Aligned.toTranscriptome.out.bam",
         "results/star-pe/{sample}/SJ.out.tab",
         "results/star-pe/{sample}/ReadsPerGene.out.tab"
+
+use rule rsem_prepare_reference from star_rsem as sr_rsem_prepare_reference with:
+    input:
+        fasta = config["reference"],
+        gtf = "results/merged/merged_ref_isoseq.gtf"
+    output:
+        "results/rsem_index/ref_isoseq.idx.fa"
+    params:
+        prefix = "results/rsem_index/ref_isoseq"
+
+use rule rsem_calculate_expression from star_rsem as sr_rsem_calculate_expression with:
+    input:
+        genome = "results/rsem_index/ref_isoseq.idx.fa",
+        transcripts = "results/star-pe/{sample}/Aligned.toTranscriptome.out.bam"
+    output:
+        multiext("results/rsem/{sample}/{sample}", ".isoforms.results", ".genes.results", ".transcript.bam")
+    params:
+        output_prefix = "results/rsem/{sample}/{sample}",
+        genome_prefix = "results/rsem_index/ref_isoseq",
+        threads = 16
+
+use rule gather_rsem_transcripts from star_rsem as sr_gather_rsem_transcripts with:
+    input:
+        expand("results/rsem/{sample}/{sample}.isoforms.results", sample = short_read_samples.index),
+    output:
+        "results/rsem-combined/isoseq_rsem_transcripts.tsv"
+    params:
+        samples = short_read_samples.index,
+        value = "expected_count",
+        key = "transcript_id"
 
 def INPUT_BAM(wc):
 	return samples.loc[wc.sample, "input_bam"]
